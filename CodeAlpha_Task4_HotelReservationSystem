@@ -1,0 +1,156 @@
+#CodeAlpha_Task4_HotelReservationSystem
+
+
+
+  import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
+import java.util.*;
+
+public class HotelReservationSystem {
+    static class Room {
+        int id;
+        String type;
+        double pricePerNight;
+        Room(int id, String type, double price) { this.id = id; this.type = type; this.pricePerNight = price; }
+        @Override public String toString() { return "Room#" + id + " " + type + " price/night:" + pricePerNight; }
+    }
+
+    static class Booking {
+        int bookingId;
+        int roomId;
+        String guestName;
+        LocalDate checkIn;
+        LocalDate checkOut;
+        Booking(int bookingId, int roomId, String guestName, LocalDate ci, LocalDate co) {
+            this.bookingId = bookingId; this.roomId = roomId; this.guestName = guestName; this.checkIn = ci; this.checkOut = co;
+        }
+        @Override public String toString() {
+            return String.format("Booking[%d] Room:%d Guest:%s %s -> %s", bookingId, roomId, guestName, checkIn, checkOut);
+        }
+    }
+
+    static Scanner sc = new Scanner(System.in);
+    static List<Room> rooms = new ArrayList<>();
+    static List<Booking> bookings = new ArrayList<>();
+    static int nextBookingId = 1;
+
+    public static void main(String[] args) {
+        initRooms();
+        while (true) {
+            System.out.println("\n--- Hotel Reservation ---");
+            System.out.println("1. List all rooms");
+            System.out.println("2. Search available rooms by type & dates");
+            System.out.println("3. Book a room");
+            System.out.println("4. Cancel booking");
+            System.out.println("5. View bookings");
+            System.out.println("6. Exit");
+            System.out.print("Choose: ");
+            String c = sc.nextLine().trim();
+            switch (c) {
+                case "1": listRooms(); break;
+                case "2": searchRooms(); break;
+                case "3": bookRoom(); break;
+                case "4": cancelBooking(); break;
+                case "5": viewBookings(); break;
+                case "6": System.out.println("Exit."); return;
+                default: System.out.println("Invalid choice.");
+            }
+        }
+    }
+
+    static void initRooms() {
+        rooms.add(new Room(101, "Standard", 2000));
+        rooms.add(new Room(102, "Standard", 2000));
+        rooms.add(new Room(201, "Deluxe", 3500));
+        rooms.add(new Room(202, "Deluxe", 3500));
+        rooms.add(new Room(301, "Suite", 6000));
+    }
+
+    static void listRooms() {
+        System.out.println("Rooms:");
+        for (Room r : rooms) System.out.println(r);
+    }
+
+    static void searchRooms() {
+        System.out.print("Enter type (Standard/Deluxe/Suite): ");
+        String type = sc.nextLine().trim();
+        LocalDate ci = readDate("check-in (YYYY-MM-DD): ");
+        if (ci == null) return;
+        LocalDate co = readDate("check-out (YYYY-MM-DD): ");
+        if (co == null) return;
+        List<Room> avail = findAvailableRooms(type, ci, co);
+        if (avail.isEmpty()) System.out.println("No rooms available for given type/dates.");
+        else {
+            System.out.println("Available rooms:");
+            for (Room r : avail) System.out.println(r);
+        }
+    }
+
+    static LocalDate readDate(String prompt) {
+        System.out.print(prompt);
+        try {
+            String s = sc.nextLine().trim();
+            return LocalDate.parse(s);
+        } catch (DateTimeParseException ex) {
+            System.out.println("Invalid date format.");
+            return null;
+        }
+    }
+
+    static List<Room> findAvailableRooms(String type, LocalDate ci, LocalDate co) {
+        List<Room> candidates = new ArrayList<>();
+        for (Room r : rooms) if (r.type.equalsIgnoreCase(type)) candidates.add(r);
+        List<Room> available = new ArrayList<>();
+        for (Room r : candidates) {
+            boolean ok = true;
+            for (Booking b : bookings) {
+                if (b.roomId == r.id && datesOverlap(ci, co, b.checkIn, b.checkOut)) { ok = false; break; }
+            }
+            if (ok) available.add(r);
+        }
+        return available;
+    }
+
+    static boolean datesOverlap(LocalDate aStart, LocalDate aEnd, LocalDate bStart, LocalDate bEnd) {
+        // overlap if start < bEnd && bStart < aEnd
+        return (aStart.isBefore(bEnd) && bStart.isBefore(aEnd));
+    }
+
+    static void bookRoom() {
+        System.out.print("Guest name: ");
+        String guest = sc.nextLine().trim();
+        System.out.print("Room type (Standard/Deluxe/Suite): ");
+        String type = sc.nextLine().trim();
+        LocalDate ci = readDate("check-in (YYYY-MM-DD): "); if (ci==null) return;
+        LocalDate co = readDate("check-out (YYYY-MM-DD): "); if (co==null) return;
+        if (!ci.isBefore(co)) { System.out.println("Check-out must be after check-in."); return; }
+        List<Room> avail = findAvailableRooms(type, ci, co);
+        if (avail.isEmpty()) { System.out.println("No rooms available."); return; }
+        Room chosen = avail.get(0);
+        Booking bk = new Booking(nextBookingId++, chosen.id, guest, ci, co);
+        bookings.add(bk);
+        long nights = java.time.temporal.ChronoUnit.DAYS.between(ci, co);
+        double amount = nights * chosen.pricePerNight;
+        System.out.println("Booked: " + bk);
+        System.out.println("Total amount for " + nights + " nights: " + amount);
+    }
+
+    static void cancelBooking() {
+        System.out.print("Enter booking id to cancel: ");
+        try {
+            int id = Integer.parseInt(sc.nextLine().trim());
+            Booking found = null;
+            for (Booking b : bookings) if (b.bookingId == id) { found = b; break; }
+            if (found == null) { System.out.println("Booking not found."); return; }
+            bookings.remove(found);
+            System.out.println("Booking cancelled: " + found);
+        } catch (NumberFormatException ex) {
+            System.out.println("Invalid id.");
+        }
+    }
+
+    static void viewBookings() {
+        if (bookings.isEmpty()) { System.out.println("No bookings."); return; }
+        for (Booking b : bookings) System.out.println(b);
+    }
+}
